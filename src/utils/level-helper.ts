@@ -547,17 +547,29 @@ export function computeReloadInterval(
   let reloadInterval = 1000 * newDetails.targetduration;
 
   if (newDetails.updated) {
-    // Use last segment duration when shorter than target duration and near live edge
+    // Use the last part duration when the last segment is built from parts,
+    // otherwise use the last segment duration when it is shorter than the
+    // target duration and the playback position is near the live edge
     const fragments = newDetails.fragments;
+    const partList = newDetails.partList;
     const liveEdgeMaxTargetDurations = 4;
     if (
-      fragments.length &&
+      (fragments.length || partList) &&
       reloadInterval * liveEdgeMaxTargetDurations > distanceToLiveEdgeMs
     ) {
-      const lastSegmentDuration =
-        fragments[fragments.length - 1].duration * 1000;
-      if (lastSegmentDuration > 0 && lastSegmentDuration < reloadInterval) {
-        reloadInterval = lastSegmentDuration;
+      let lastDuration = fragments.length
+        ? fragments[fragments.length - 1].duration * 1000
+        : Infinity;
+      // Parts of the last segment can become available before the full
+      // segment. Use the shorter part duration when there is one.
+      if (partList?.length) {
+        const lastPartDuration = partList[partList.length - 1].duration * 1000;
+        if (lastPartDuration > 0) {
+          lastDuration = Math.min(lastDuration, lastPartDuration);
+        }
+      }
+      if (lastDuration > 0 && lastDuration < reloadInterval) {
+        reloadInterval = lastDuration;
       }
     }
   } else {

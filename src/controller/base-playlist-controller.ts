@@ -234,7 +234,12 @@ export default class BasePlaylistController
       }
       const bufferInfo = this.hls.mainForwardBufferInfo;
       const position = bufferInfo ? bufferInfo.end - bufferInfo.len : 0;
-      const distanceToLiveEdgeMs = (details.edge - position) * 1000;
+      // Without forward buffer info there is no playback position to measure
+      // the distance to the live edge from (e.g. the first time a live playlist
+      // is loaded). In that case use the target duration.
+      const distanceToLiveEdgeMs = bufferInfo
+        ? (details.edge - position) * 1000
+        : Infinity;
       const reloadInterval = computeReloadInterval(
         details,
         distanceToLiveEdgeMs,

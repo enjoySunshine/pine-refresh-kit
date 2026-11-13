@@ -567,8 +567,11 @@ class PlaylistLoader implements NetworkComponentAPI {
         name: '',
         url,
       };
+      // There is no playback position to measure the distance to the live edge
+      // from on the initial load, so schedule the first reload after one target
+      // duration.
       levelDetails.requestScheduled =
-        stats.loading.start + computeReloadInterval(levelDetails, 0);
+        stats.loading.start + computeReloadInterval(levelDetails);
 
       hls.trigger(Events.MANIFEST_LOADED, {
         levels: [singleLevel],

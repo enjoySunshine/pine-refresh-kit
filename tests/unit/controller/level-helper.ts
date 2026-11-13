@@ -55,6 +55,23 @@ const generatePlaylist = (sequenceNumbers, offset = 0, duration = 5) => {
   return playlist;
 };
 
+const partsFor = (fragIndex: number, ...durations: number[]): Part[] => {
+  const frag = new Fragment(PlaylistLevelType.MAIN, '') as MediaFragment;
+  frag.sn = fragIndex;
+  let previous: Part | undefined;
+  return durations.map((duration, i) => {
+    const part = new Part(
+      new AttrList({ DURATION: duration, URI: `part-${i}.ts` }),
+      frag,
+      '',
+      i,
+      previous,
+    );
+    previous = part;
+    return part;
+  });
+};
+
 const getIteratedSequence = (oldPlaylist, newPlaylist) => {
   const actual: number[] = [];
   mapFragmentIntersection(oldPlaylist, newPlaylist, (oldFrag, newFrag) => {
@@ -1590,6 +1607,51 @@ getMP4MediaFragment.mp4?FragmentNumber=91343852333398821516816632930230891347979
       expect(actual).to.equal(5000);
       const actualLow = computeReloadInterval(newPlaylist, 14000);
       expect(actualLow).to.equal(2000);
+    });
+
+    it('returns the last part duration when near the live edge', function () {
+      const newPlaylist = generatePlaylist([1, 2], 0, 4);
+      newPlaylist.targetduration = 6;
+      newPlaylist.updated = true;
+      newPlaylist.partList = partsFor(2, 1, 1);
+      const actual = computeReloadInterval(newPlaylist, 6000);
+      expect(actual).to.equal(1000);
+    });
+
+    it('returns the last part duration when it is longer than the last segment duration', function () {
+      const newPlaylist = generatePlaylist([1, 2], 0, 2);
+      newPlaylist.targetduration = 6;
+      newPlaylist.updated = true;
+      newPlaylist.partList = partsFor(2, 3);
+      const actual = computeReloadInterval(newPlaylist, 1000);
+      expect(actual).to.equal(2000);
+    });
+
+    it('returns the targetduration when far from the live edge', function () {
+      const newPlaylist = generatePlaylist([1, 2], 0, 4);
+      newPlaylist.targetduration = 6;
+      newPlaylist.updated = true;
+      newPlaylist.partList = partsFor(2, 1, 1);
+      const actual = computeReloadInterval(newPlaylist, 100000);
+      expect(actual).to.equal(6000);
+    });
+
+    it('returns the targetduration when there is no playback position', function () {
+      const newPlaylist = generatePlaylist([1, 2], 0, 4);
+      newPlaylist.targetduration = 6;
+      newPlaylist.updated = true;
+      newPlaylist.partList = partsFor(2, 1, 1);
+      const actual = computeReloadInterval(newPlaylist);
+      expect(actual).to.equal(6000);
+    });
+
+    it('halves the targetduration when unchanged with parts, regardless of distance to the live edge', function () {
+      const newPlaylist = generatePlaylist([1, 2], 0, 4);
+      newPlaylist.targetduration = 6;
+      newPlaylist.updated = false;
+      newPlaylist.partList = partsFor(2, 1, 1);
+      expect(computeReloadInterval(newPlaylist, 1000)).to.equal(3000);
+      expect(computeReloadInterval(newPlaylist, 100000)).to.equal(3000);
     });
   });
 
